@@ -1,6 +1,6 @@
 <div align="center">
 
-#  CoreSync
+# CoreSync
 
 ### *When data chaos is not an option - real-time reconciliation powered by autonomous reasoning*
 
@@ -16,54 +16,54 @@
 
 <br/>
 
-> **CoreSync** is an autonomous reasoning agent that eliminates 30-day manual reconciliation cycles in Simulation Centers,  
+> **CoreSync** is an autonomous reasoning agent that eliminates 30-day manual reconciliation cycles in Simulation Centers,
 > replacing them with real-time, AI-driven data synchronization via **Microsoft Foundry IQ**.
 
 </div>
 
 ---
 
-##  The Challenge (AS-IS)
+## The Challenge (AS-IS)
 
 Simulation Centers operate across multiple physical spaces - classrooms, labs, procedural rooms - each generating its own data stream. The result? A fragmented, error-prone environment that breaks operational continuity.
 
 | Pain Point | Impact |
 |---|---|
-|  **Data silos** between classrooms and administrative systems | No unified student view |
-|  **Manual check-in / check-out** processes | Missing records, ghost sessions |
-|  **DNI format inconsistencies** across source systems | Failed reconciliation joins |
-|  **30-day reporting lag** | Decisions made on stale data |
-|  **Administrative chaos** | Staff overloaded with data cleanup |
+| **Data silos** between classrooms and administrative systems | No unified student view |
+| **Manual check-in / check-out** processes | Missing records, ghost sessions |
+| **DNI format inconsistencies** across source systems | Failed reconciliation joins |
+| **30-day reporting lag** | Decisions made on stale data |
+| **Administrative chaos** | Staff overloaded with data cleanup |
 
 > *Every unresolved inconsistency is a reconciliation debt that compounds over time. CoreSync eliminates it at the source.*
 
 ---
 
-##  The Solution (TO-BE)
+## The Solution (TO-BE)
 
 CoreSync deploys an **autonomous reasoning agent** that continuously monitors, normalizes, and reconciles student activity data across all operational touchpoints of a Simulation Center.
 
--  **Intelligent normalization** - DNI formats are standardized before any join operation is attempted
--  **Conflict resolution** - Missing check-outs are inferred from session context, scheduling rules, and historical patterns
--  **Automatic segmentation** - Students are categorized in real time by cohort, status, and simulation progress
--  **Zero-latency pipeline** - What took 30 days now happens continuously, without human intervention
--  **Closed-loop feedback** - Every resolved inconsistency trains the agent's heuristics for future cases
+- **Intelligent normalization** - DNI formats are standardized before any join operation is attempted
+- **Conflict resolution** - Missing check-outs are inferred from session context, scheduling rules, and historical patterns
+- **Automatic segmentation** - Students are categorized in real time by cohort, status, and simulation progress
+- **Zero-latency pipeline** - What took 30 days now happens continuously, without human intervention
+- **Closed-loop feedback** - Every resolved inconsistency trains the agent's heuristics for future cases
 
 ---
 
-##  Tech Stack
+## Tech Stack
 
 | Layer | Technology | Role |
 |---|---|---|
-|  **Reasoning Engine** | Azure OpenAI (GPT-4o) | Multi-step decision making, conflict resolution logic |
-|  **Agent Orchestration** | Microsoft Foundry IQ | Autonomous agent lifecycle, tool routing, memory |
-|  **Data Layer** | Microsoft Dataverse | Unified record storage, entity modeling, audit trail |
-|  **Runtime** | Python 3.11+ | Core agent logic, normalization pipelines, connectors |
-|  **Integration** | Power Platform Connectors | Real-time triggers from source systems |
+| **Reasoning Engine** | Azure OpenAI (GPT-4o) | Multi-step decision making, conflict resolution logic |
+| **Agent Orchestration** | Microsoft Foundry IQ | Autonomous agent lifecycle, tool routing, memory |
+| **Data Layer** | Microsoft Dataverse | Unified record storage, entity modeling, audit trail |
+| **Runtime** | Python 3.11+ | Core agent logic, normalization pipelines, connectors |
+| **Integration** | Power Platform Connectors | Real-time triggers from source systems |
 
 ---
 
-##  Reasoning Logic
+## Reasoning Logic
 
 CoreSync does not follow a rigid script. It **reasons** through each reconciliation task using a structured cognitive loop:
 
@@ -84,28 +84,28 @@ For each flagged inconsistency, the agent queries Foundry IQ's reasoning chain:
 
 Based on these inferences, the agent either resolves the record or escalates with a confidence score.
 
-**Step 5 — Segmentation & Output**
+**Step 5 - Segmentation & Output**
 Reconciled records are written back to Dataverse with enriched metadata: segment tags, resolution method, confidence level, and a full audit trail.
 
 ---
 
-##  Architecture Flow
+## Architecture Flow
 
 ```mermaid
 flowchart LR
-    subgraph Sources[" Data Sources"]
+    subgraph Sources["Data Sources"]
         A[Classroom Terminals]
         B[Admin Portal]
         C[Scheduling System]
     end
 
-    subgraph Agent[" CoreSync Agent — Microsoft Foundry IQ"]
+    subgraph Agent["CoreSync Agent - Microsoft Foundry IQ"]
         D[Ingest & Normalize]
         E[Reason & Resolve]
         F[Segment & Score]
     end
 
-    subgraph Output[" Output Layer"]
+    subgraph Output["Output Layer"]
         G[(Dataverse)]
         H[Real-Time Dashboard]
         I[Audit Log]
@@ -123,7 +123,7 @@ flowchart LR
 
 ---
 
-##  Why This Stack?
+## Why This Stack?
 
 Every technology choice in CoreSync was made for a specific, defensible reason - not for hype.
 
@@ -141,7 +141,7 @@ The data engineering and AI ecosystems both live in Python. Libraries for normal
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ```bash
 # Clone the repository
@@ -153,17 +153,17 @@ pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# → Add your Azure OpenAI endpoint, Foundry IQ credentials, and Dataverse connection string
+# Add your Azure OpenAI endpoint, Foundry IQ credentials, and Dataverse connection string
 
 # Run the agent
 python agent/main.py
 ```
 
-> ℹ️ Full environment setup documentation is available in [`/docs/setup.md`](./docs/setup.md)
+> Full environment setup documentation is available in [`/docs/setup.md`](./docs/setup.md)
 
 ---
 
-##  Project Structure
+## Project Structure
 
 ```
 coresync/
@@ -190,23 +190,23 @@ coresync/
 
 <div align="center">
 
-##  Follow the Build
+## Community & Updates
 
-This project was built live. If you want to see how autonomous agents go from concept to production - the architecture decisions, the debugging sessions, the real problems - follow along on YouTube.
+</div>
 
-**[@CodeNoZhiend](https://www.youtube.com/@CodeNoZhiend)**
+### What is CodeNoZhiend?
 
-*No fluff. No filler. Just engineering.*
+This channel is my space to document the **"unfiltered side"** of programming. You'll find everything from technical breakdowns of coding and database challenges, to the culture and lifestyle behind the dev.
 
-<br/>
+If you're looking for real-world layouts, algorithmic problem solving, or just want to understand what working in tech actually feels like - this is the place.
 
-[![YouTube](https://img.shields.io/badge/YouTube-@CodeNoZhiend-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/@CodeNoZhiend)
+[Check out the content at **@CodeNoZhiend**](https://www.youtube.com/@CodeNoZhiend)
 
-<br/>
+<div align="center">
 
 ---
 
-*Built for the **Agents League Hackathon** · Reasoning Agents Track*  
-*Made with precision, caffeine, and a genuine intolerance for manual processes* ⚡
+*Built for the **Agents League Hackathon** - Reasoning Agents Track*
+*Made with precision, caffeine, and a genuine intolerance for manual processes*
 
 </div>
