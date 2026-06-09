@@ -1,0 +1,19 @@
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Archivos de Python compilados
+__pycache__/
+*.pyc
+
+# Archivos de configuración y secretos
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+
+# Carpetas de datos temporales
+data/raw/
