@@ -16,6 +16,9 @@
 
 <br/>
 
+<img width="1536" height="800" alt="fe81375f-6a58-44d8-a11f-d24d6acb494d_1780992465210" src="https://github.com/user-attachments/assets/a138f17a-79a2-4c09-bd07-71de8bf96b7b" />
+
+
 > **CoreSync** is an autonomous reasoning agent that eliminates 30-day manual reconciliation cycles in Simulation Centers,
 > replacing them with real-time, AI-driven data synchronization via **Microsoft Foundry IQ**.
 
