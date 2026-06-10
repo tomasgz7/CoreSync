@@ -22,10 +22,6 @@
 > certificate pipelines - replacing manual reconciliation cycles with grounded, auditable,
 > AI-driven decisions backed by Microsoft Foundry IQ policies.
 
-<br/>
-
-<img src="assets/cover.png" alt="CoreSync Cover" width="800"/>
-
 </div>
 
 ---
@@ -161,12 +157,13 @@ Key Foundry IQ Audit Rules (sample):
 
 **Prerequisites**
 
+Python 3.10 or higher is required. The dry-run simulation relies exclusively on Python standard
+library modules (`re`, `unicodedata`, `hashlib`, `json`, `logging`, `argparse`, `pathlib`) and
+requires no external package installation to execute.
+
 ```bash
 git clone https://github.com/your-username/coresync.git
 cd coresync
-python -m venv .venv
-source .venv/bin/activate       # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
 ```
 
 **Dry-run simulation (no Azure credentials required)**
@@ -232,7 +229,7 @@ python agent/main.py --dry-run
 **Live run with Azure OpenAI**
 
 ```bash
-cp .env.example .env
+cp env.example .env
 # Edit .env with your credentials
 python agent/main.py
 ```
@@ -244,7 +241,6 @@ python agent/main.py
 ```
 coresync/
 ├── agent/
-│   ├── __init__.py
 │   ├── main.py                  - Pipeline orchestrator (4-phase execution)
 │   ├── normalizer.py            - Curation Agent: ID and name normalization
 │   └── resolver.py              - Reasoning Agent: Azure OpenAI CoT resolution
@@ -253,15 +249,10 @@ coresync/
 │   └── foundry.py               - Foundry IQ Knowledge Base connector
 ├── data/
 │   └── synthetic_records.json   - 100% fictional test dataset (10 records, 5 pairs)
-├── assets/
-│   └── cover.png                - Project cover image
-├── docs/
-│   └── setup.md                 - Detailed deployment guide
-├── tests/
-│   └── test_normalizer.py       - Unit tests for DataNormalizer
-├── .env.example                 - Environment variable template
-├── requirements.txt
-└── README.md
+├── .gitignore
+├── env.example                  - Environment variable template
+├── README.md                    - Project documentation
+└── test_normalizer.py           - Unit tests for DataNormalizer
 ```
 
 ---
