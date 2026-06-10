@@ -1,0 +1,20 @@
+[
+  {
+    "employee_id": "EMP-9014",
+    "role": "AI Engineer",
+    "meeting_hours_per_week": 26,
+    "focus_hours_per_week": 6,
+    "preferred_learning_slot": "Friday_Afternoon",
+    "workload_stress_index": "HIGH",
+    "m365_status_signal": "InAMeeting"
+  },
+  {
+    "employee_id": "EMP-3309",
+    "role": "Cloud Architect",
+    "meeting_hours_per_week": 11,
+    "focus_hours_per_week": 22,
+    "preferred_learning_slot": "Tuesday_Morning",
+    "workload_stress_index": "LOW",
+    "m365_status_signal": "Available"
+  }
+]
