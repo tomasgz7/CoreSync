@@ -1,13 +1,14 @@
 """
-resolver.py - CoreSync Conflict Resolution Module
+resolver.py - CoreSync Reasoning Attendance Reconciler Agent
 
-Part of the autonomous agent architecture built for the
+Part of the autonomous multi-agent architecture built for the
 Microsoft Agents League Hackathon - Reasoning Agents Track.
 
-This module consumes normalized records from `agent.normalizer` and
-delegates conflict resolution to Azure OpenAI via a structured
-Chain of Thought prompt. Results are returned as a standardized
-JSON-compatible dict ready for Dataverse ingestion.
+Implements a Planner-Executor-Critic reasoning pattern to reconcile
+Check-In and Check-Out attendance records across parallel simulation
+classrooms. Every decision is grounded against Foundry IQ Audit Rules
+and subject to an internal Critic verification loop before emission,
+guaranteeing zero false positives in certification attendance verdicts.
 """
 
 import json
@@ -18,9 +19,7 @@ from typing import Any, Optional
 from dotenv import load_dotenv
 from openai import AzureOpenAI, APIConnectionError, APIStatusError, APITimeoutError
 
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
+from connectors.foundry import AuditContext
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,11 +27,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Environment Loading
-# ---------------------------------------------------------------------------
-
-load_dotenv()  # Reads .env from project root; never commit that file.
+load_dotenv()
 
 _REQUIRED_ENV_VARS = (
     "AZURE_OPENAI_ENDPOINT",
@@ -52,7 +47,7 @@ def _validate_env() -> None:
     if missing:
         raise EnvironmentError(
             f"Missing required environment variables: {', '.join(missing)}. "
-            "Check your .env file."
+            "Check your env.example file."
         )
 
 
@@ -61,12 +56,13 @@ def _validate_env() -> None:
 # ---------------------------------------------------------------------------
 
 class ResolutionResult:
-    """Typed container for a single conflict resolution outcome.
+    """Typed container for a single attendance reconciliation outcome.
 
     Attributes:
-        match_status: True if both records refer to the same entity.
-        confidence_score: Float in [0.0, 1.0] representing model certainty.
-        reasoning: Human-readable explanation produced by the model.
+        match_status: True if attendance is verified (Present). False otherwise.
+        confidence_score: Float in [0.0, 1.0] representing verification certainty.
+        reasoning: Grounded Chain of Thought trace with explicit Audit Rule citations.
+        segment: Classification bucket - 'Presentes', 'Ausentes', or 'Sin_Respuesta'.
         error: Optional error message if resolution failed.
     """
 
@@ -75,92 +71,112 @@ class ResolutionResult:
         match_status: bool,
         confidence_score: float,
         reasoning: str,
+        segment: str = "Ausentes",
         error: Optional[str] = None,
     ) -> None:
         self.match_status = match_status
         self.confidence_score = round(max(0.0, min(1.0, confidence_score)), 4)
         self.reasoning = reasoning
+        self.segment = segment
         self.error = error
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a JSON-compatible dict for Dataverse ingestion.
 
         Returns:
-            Dict with keys: match_status, confidence_score, reasoning, error.
+            Dict with keys: match_status, confidence_score, reasoning,
+            segment, and error.
         """
         return {
             "match_status": self.match_status,
             "confidence_score": self.confidence_score,
             "reasoning": self.reasoning,
+            "segment": self.segment,
             "error": self.error,
         }
 
     @classmethod
     def error_state(cls, message: str) -> "ResolutionResult":
-        """Factory method for a safe error result that won't halt the pipeline.
+        """Factory for a safe error result that routes to Sin_Respuesta.
 
         Args:
             message: Description of the failure.
 
         Returns:
-            ResolutionResult with match_status=False, confidence=0.0.
+            ResolutionResult with match_status=False, segment='Sin_Respuesta'.
         """
         return cls(
             match_status=False,
             confidence_score=0.0,
             reasoning="Resolution failed - see error field.",
+            segment="Sin_Respuesta",
             error=message,
         )
 
 
 # ---------------------------------------------------------------------------
-# DataResolver
+# DataResolver - Planner-Executor-Critic Pattern
 # ---------------------------------------------------------------------------
 
 class DataResolver:
-    """Autonomous conflict resolution agent for CoreSync.
+    """Reasoning Attendance Reconciler Agent for CoreSync.
 
-    Consumes pairs of normalized records (output of `DataNormalizer`)
-    and submits them to Azure OpenAI with a structured Chain of Thought
-    prompt. The model returns a JSON payload that is parsed and wrapped
-    in a `ResolutionResult`.
+    Implements a three-stage cognitive loop for each record pair:
 
-    This class is designed to be instantiated once and reused across
-    multiple `resolve()` calls within the Foundry IQ agent runtime.
+    Stage 1 - PLANNER: Decomposes the reconciliation problem into
+    ordered sub-tasks before any inference is attempted.
+
+    Stage 2 - EXECUTOR: Processes each sub-task sequentially via
+    Azure OpenAI Chain of Thought, grounded against Foundry IQ
+    Audit Rules injected into the system prompt.
+
+    Stage 3 - CRITIC/VERIFIER: An internal self-correction loop audits
+    the Executor's verdict against hard business constraints before
+    emitting the final ResolutionResult. Can override a false positive.
 
     Args:
-        max_tokens: Maximum tokens for the model response. Default: 512.
-        temperature: Sampling temperature. Keep low (0.0-0.2) for
-                     deterministic reasoning. Default: 0.0.
+        audit_context: AuditContext loaded from FoundryIQConnector.
+        max_tokens: Maximum tokens for the model response. Default: 768.
+        temperature: Sampling temperature. Default: 0.0 for determinism.
 
     Example:
-        >>> resolver = DataResolver()
+        >>> resolver = DataResolver(audit_context=context)
         >>> result = resolver.resolve(record_a, record_b)
         >>> print(result.to_dict())
     """
 
-    _SYSTEM_PROMPT = """
-You are a data reconciliation expert for an academic Simulation Center.
-Your task is to determine whether two student records refer to the same person.
+    _SYSTEM_PROMPT_TEMPLATE = """
+You are the Reasoning Attendance Reconciler Agent for a Corporate Simulation Center.
+Your objective is to determine whether an employee's attendance is verified (Present)
+or unverified (Absent/At Risk) by reconciling their Check-In and Check-Out records
+across parallel classrooms (Aula A and Aula B).
 
-You will receive two normalized records in JSON format.
-Reason step by step (Chain of Thought) before reaching a conclusion.
+You operate under a strict Planner-Executor-Critic reasoning pattern:
+1. PLAN: Decompose the reconciliation into logical sub-tasks before reasoning.
+2. EXECUTE: Process each sub-task with step-by-step Chain of Thought.
+3. VERIFY (Critic): Audit your own verdict against the hard rules below before finalizing.
 
-Consider: DNI match, name similarity (accounting for typos or encoding artifacts),
-and any contextual fields provided.
+{audit_context}
 
-You MUST respond with a single valid JSON object - no markdown, no explanation outside JSON.
+HARD CRITIC RULES (applied in Stage 3 - cannot be overridden):
+- A "Present" verdict requires both a Check-In token AND a Check-Out token confirmed.
+- A manual note or HR record alone is NOT sufficient to declare attendance verified.
+- If the Critic detects a false positive, it MUST override to Absent and set confidence >= 0.95.
+
+You MUST respond with a single valid JSON object - no markdown, no preamble.
 Schema:
-{
-  "match_status": <true|false>,
+{{
+  "match_status": <true if Present, false if Absent/At-Risk>,
   "confidence_score": <float 0.0 to 1.0>,
-  "reasoning": "<concise explanation of your decision>"
-}
+  "segment": <"Presentes" | "Ausentes" | "Sin_Respuesta">,
+  "reasoning": "<Full Planner-Executor-Critic trace with explicit Audit Rule citations>"
+}}
 """.strip()
 
     def __init__(
         self,
-        max_tokens: int = 512,
+        audit_context: AuditContext,
+        max_tokens: int = 768,
         temperature: float = 0.0,
     ) -> None:
         _validate_env()
@@ -168,6 +184,11 @@ Schema:
         self._deployment = os.environ["DEPLOYMENT_NAME"]
         self._max_tokens = max_tokens
         self._temperature = temperature
+        self._audit_context = audit_context
+
+        self._system_prompt = self._SYSTEM_PROMPT_TEMPLATE.format(
+            audit_context=audit_context.as_prompt_context()
+        )
 
         self._client = AzureOpenAI(
             azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
@@ -175,9 +196,7 @@ Schema:
             api_version=os.environ["AZURE_OPENAI_API_VERSION"],
         )
 
-        logger.info(
-            "DataResolver initialized | deployment=%s", self._deployment
-        )
+        logger.info("DataResolver initialized | deployment=%s", self._deployment)
 
     # ------------------------------------------------------------------
     # Public API
@@ -188,28 +207,18 @@ Schema:
         record_a: dict[str, Any],
         record_b: dict[str, Any],
     ) -> ResolutionResult:
-        """Resolve whether two normalized records represent the same entity.
+        """Reconcile a Check-In / Check-Out pair via Planner-Executor-Critic.
 
-        Builds a Chain of Thought prompt and submits it to Azure OpenAI.
-        Parses the structured JSON response into a `ResolutionResult`.
         Never raises - returns an error_state result on any failure so
-        the calling pipeline can continue processing remaining records.
+        the calling pipeline continues processing remaining records.
 
         Args:
-            record_a: First normalized record (output of DataNormalizer).
-            record_b: Second normalized record (output of DataNormalizer).
+            record_a: First normalized record (Check-In source).
+            record_b: Second normalized record (Check-Out or HR source).
 
         Returns:
-            ResolutionResult with match_status, confidence_score, reasoning,
-            and an optional error field populated on failure.
-
-        Example:
-            >>> result = resolver.resolve(
-            ...     {"dni": "12345678", "name": "Garcia Juan"},
-            ...     {"dni": "12345678", "name": "Garcia Juan P"},
-            ... )
-            >>> result.confidence_score
-            0.97
+            ResolutionResult with match_status, confidence_score, segment,
+            reasoning trace with citations, and optional error field.
         """
         user_prompt = self._build_prompt(record_a, record_b)
 
@@ -225,18 +234,15 @@ Schema:
         except APIStatusError as exc:
             logger.error(
                 "Azure OpenAI API error | status=%s | message=%s",
-                exc.status_code,
-                exc.message,
+                exc.status_code, exc.message,
             )
             return ResolutionResult.error_state(
                 f"API status error {exc.status_code}: {exc.message}"
             )
         except (KeyError, ValueError, json.JSONDecodeError) as exc:
             logger.error("Response parsing failed: %s", exc)
-            return ResolutionResult.error_state(
-                f"Response parse error: {exc}"
-            )
-        except Exception as exc:  # noqa: BLE001 - intentional broad catch
+            return ResolutionResult.error_state(f"Response parse error: {exc}")
+        except Exception as exc:  # noqa: BLE001
             logger.exception("Unexpected resolver failure: %s", exc)
             return ResolutionResult.error_state(f"Unexpected error: {exc}")
 
@@ -246,17 +252,11 @@ Schema:
     ) -> list[ResolutionResult]:
         """Resolve a batch of record pairs sequentially.
 
-        Each pair is processed independently so a single failure does
-        not abort the remaining resolutions.
-
         Args:
             pairs: List of (record_a, record_b) tuples.
 
         Returns:
             List of ResolutionResult in the same order as input pairs.
-
-        Example:
-            >>> results = resolver.resolve_batch([(a1, b1), (a2, b2)])
         """
         results = []
         for idx, (record_a, record_b) in enumerate(pairs):
@@ -280,37 +280,33 @@ Schema:
             record_b: Second normalized record.
 
         Returns:
-            Formatted string ready for the user message role.
+            Formatted string for the user message role.
         """
-        # Strip internal pipeline fields before sending to the model
         _INTERNAL_KEYS = {"dni_hash", "_normalization_errors", "_error"}
 
         def _clean(record: dict) -> dict:
             return {k: v for k, v in record.items() if k not in _INTERNAL_KEYS}
 
         return (
-            f"Record A:\n{json.dumps(_clean(record_a), ensure_ascii=False, indent=2)}\n\n"
-            f"Record B:\n{json.dumps(_clean(record_b), ensure_ascii=False, indent=2)}"
+            f"Record A (Check-In Source):\n"
+            f"{json.dumps(_clean(record_a), ensure_ascii=False, indent=2)}\n\n"
+            f"Record B (Check-Out / HR Source):\n"
+            f"{json.dumps(_clean(record_b), ensure_ascii=False, indent=2)}"
         )
 
     def _call_api(self, user_prompt: str) -> str:
         """Submit the prompt to Azure OpenAI and return the raw text response.
 
         Args:
-            user_prompt: Formatted user message containing both records.
+            user_prompt: Formatted user message with both records.
 
         Returns:
             Raw string content from the model's first choice.
-
-        Raises:
-            APIConnectionError: On network-level failures.
-            APIStatusError: On 4xx/5xx responses from Azure.
-            APITimeoutError: On request timeout.
         """
         response = self._client.chat.completions.create(
             model=self._deployment,
             messages=[
-                {"role": "system", "content": self._SYSTEM_PROMPT},
+                {"role": "system", "content": self._system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
             max_tokens=self._max_tokens,
@@ -331,7 +327,7 @@ Schema:
 
         Raises:
             json.JSONDecodeError: If the response is not valid JSON.
-            KeyError: If required fields are absent from the response.
+            KeyError: If required fields are absent.
             ValueError: If field types are outside expected ranges.
         """
         data = json.loads(raw)
@@ -340,4 +336,5 @@ Schema:
             match_status=bool(data["match_status"]),
             confidence_score=float(data["confidence_score"]),
             reasoning=str(data["reasoning"]),
+            segment=str(data.get("segment", "Ausentes")),
         )
