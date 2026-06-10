@@ -4,13 +4,14 @@ foundry.py - CoreSync Foundry IQ Connector
 Part of the autonomous agent architecture built for the
 Microsoft Agents League Hackathon - Reasoning Agents Track.
 
-Simulates retrieval of corporate audit directives and reconciliation
-policies from a Microsoft Foundry IQ Knowledge Base. In a production
-deployment, this connector would authenticate against the Foundry IQ
-API and query a live policy store backed by Dataverse.
+Simulates retrieval of grounded corporate audit directives from a
+Microsoft Foundry IQ indexed Knowledge Base. In a production deployment,
+this connector would authenticate against Foundry IQ using managed identity
+and query a live policy store backed by Dataverse.
 
-For the hackathon demo, the knowledge base is an in-memory fixture
-that mirrors the structure of a real Foundry IQ policy payload.
+Each policy is assigned an explicit "Audit Rule #N" identifier so the
+downstream Resolver Agent can cite specific rules in its reasoning trace,
+enabling grounded, auditable decisions that minimize LLM hallucination.
 """
 
 import logging
@@ -25,59 +26,97 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 @dataclass
-class ReconciliationPolicy:
-    """Represents a single policy directive retrieved from Foundry IQ.
+class AuditRule:
+    """A single numbered audit directive retrieved from Foundry IQ.
 
     Attributes:
-        policy_id: Unique identifier for the policy (e.g. POL-001).
-        description: Human-readable description of the rule.
+        rule_number: Sequential rule identifier used for downstream citation.
+        title: Short descriptive title for display and logging.
+        description: Full rule text injected into the reasoning prompt.
         match_threshold: Minimum confidence_score to auto-approve a match.
-        escalation_threshold: Scores below this trigger manual review.
-        active: Whether this policy is currently enforced.
-        metadata: Arbitrary key-value pairs for extensibility.
+        escalation_threshold: Scores below this value trigger manual review.
+        active: Whether this rule is currently enforced in the environment.
+        metadata: Arbitrary extensibility bag for versioning and ownership.
     """
-    policy_id: str
+    rule_number: int
+    title: str
     description: str
     match_threshold: float
     escalation_threshold: float
     active: bool = True
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def citation_label(self) -> str:
+        """Return the canonical citation string for use in reasoning traces.
+
+        Returns:
+            String formatted as 'Audit Rule #N - Title'.
+        """
+        return f"Audit Rule #{self.rule_number} - {self.title}"
+
 
 @dataclass
 class AuditContext:
-    """Aggregated context injected into the reasoning pipeline.
+    """Aggregated grounded context injected into the reasoning pipeline.
 
     Attributes:
-        policies: List of active ReconciliationPolicy directives.
-        certification_rules: Domain-specific rules for academic certification.
-        source_system_trust: Trust score per source system identifier.
+        rules: List of active AuditRule directives.
+        domain_policies: High-level organizational certification policies.
+        source_system_trust: Trust coefficient per source system identifier.
     """
-    policies: list[ReconciliationPolicy]
-    certification_rules: list[str]
+    rules: list[AuditRule]
+    domain_policies: list[str]
     source_system_trust: dict[str, float]
+
+    def active_rules(self) -> list[AuditRule]:
+        """Return only the currently active rules.
+
+        Returns:
+            Filtered list of AuditRule instances where active is True.
+        """
+        return [r for r in self.rules if r.active]
 
     def as_prompt_context(self) -> str:
         """Serialize the audit context into a prompt-injectable string.
 
+        Formats active rules with their full descriptions and citation labels
+        so the Resolver Agent can reference specific rules in its output.
+        This grounding mechanism is the primary defense against hallucination.
+
         Returns:
-            Formatted string summarizing active policies and rules,
-            suitable for prepending to a Chain of Thought prompt.
+            Structured multi-line string ready for system prompt injection.
         """
-        active = [p for p in self.policies if p.active]
-        lines = ["[FOUNDRY IQ AUDIT CONTEXT]"]
-        lines.append(f"Active policies: {len(active)}")
-        for p in active:
+        active = self.active_rules()
+        lines = [
+            "=" * 60,
+            "FOUNDRY IQ - GROUNDED AUDIT CONTEXT",
+            "Source: Enterprise Certification Governance Knowledge Base",
+            f"Active Rules: {len(active)} | Total Loaded: {len(self.rules)}",
+            "=" * 60,
+            "",
+            "[ ACTIVE AUDIT RULES ]",
+        ]
+
+        for rule in active:
+            lines.append(f"  {rule.citation_label()}")
+            lines.append(f"    {rule.description}")
             lines.append(
-                f"  - {p.policy_id}: {p.description} "
-                f"(match >= {p.match_threshold}, escalate < {p.escalation_threshold})"
+                f"    Thresholds: auto-approve >= {rule.match_threshold} | "
+                f"escalate < {rule.escalation_threshold}"
             )
-        lines.append("Certification rules:")
-        for rule in self.certification_rules:
-            lines.append(f"  * {rule}")
-        lines.append("Source system trust levels:")
+            lines.append("")
+
+        lines.append("[ DOMAIN POLICIES ]")
+        for policy in self.domain_policies:
+            lines.append(f"  * {policy}")
+
+        lines.append("")
+        lines.append("[ SOURCE SYSTEM TRUST COEFFICIENTS ]")
         for system, trust in self.source_system_trust.items():
-            lines.append(f"  - {system}: {trust:.2f}")
+            bar = "#" * int(trust * 10)
+            lines.append(f"  {system:<35} {trust:.2f}  [{bar}]")
+
+        lines.append("=" * 60)
         return "\n".join(lines)
 
 
@@ -88,18 +127,18 @@ class AuditContext:
 class FoundryIQConnector:
     """Simulated connector to Microsoft Foundry IQ Knowledge Base.
 
-    In production, this class would authenticate with Foundry IQ using
-    managed identity or service principal credentials and query the
-    policy store via the Foundry IQ REST API.
+    Retrieves grounded audit rules and domain policies that govern
+    enterprise certification identity matching. The numbered rule format
+    (Audit Rule #N) enables the Resolver Agent to produce citations in
+    its reasoning trace rather than free-form hallucinations.
 
-    For hackathon purposes, it returns a deterministic in-memory fixture
-    that reflects realistic corporate audit directives for an academic
-    Simulation Center.
+    In production, the fetch_audit_context() method would replace the
+    in-memory fixture with an authenticated REST call to the Foundry IQ
+    indexing endpoint, returning semantically chunked policy documents
+    from a Dataverse-backed knowledge store.
 
     Args:
-        environment: Deployment environment tag. Affects which policy
-                     fixture is returned. Accepts 'dev', 'staging', 'prod'.
-                     Default: 'dev'.
+        environment: Deployment environment. Accepts 'dev', 'staging', 'prod'.
 
     Example:
         >>> connector = FoundryIQConnector(environment="dev")
@@ -107,57 +146,116 @@ class FoundryIQConnector:
         >>> print(context.as_prompt_context())
     """
 
-    _POLICY_FIXTURES: dict[str, list[dict[str, Any]]] = {
+    _RULE_FIXTURES: dict[str, list[dict[str, Any]]] = {
         "dev": [
             {
-                "policy_id": "POL-001",
-                "description": "Auto-approve DNI exact match with name similarity >= 80%",
+                "rule_number": 1,
+                "title": "Employee ID Format Normalization",
+                "description": (
+                    "All Employee IDs must be normalized to a flat alphanumeric "
+                    "format before any join operation. UPN-style prefixes (e.g., "
+                    "'DOMAIN\\\\user_id'), non-alphanumeric separators, and "
+                    "case differences must be stripped. Two IDs that reduce to "
+                    "the same alphanumeric sequence are considered equivalent."
+                ),
                 "match_threshold": 0.85,
                 "escalation_threshold": 0.50,
                 "active": True,
-                "metadata": {"owner": "DataGovernance", "version": "2.1"},
+                "metadata": {"owner": "DataGovernance", "version": "3.1"},
             },
             {
-                "policy_id": "POL-002",
-                "description": "Flag missing check-out sessions exceeding 4-hour window",
-                "match_threshold": 0.75,
-                "escalation_threshold": 0.40,
+                "rule_number": 2,
+                "title": "OCR Character Substitution Detection",
+                "description": (
+                    "Records sourced from SYS-OCR-SCANNER must be evaluated for "
+                    "common OCR substitution errors: digit '0' misread as letter 'O', "
+                    "digit '1' misread as letter 'I' or 'l', digit '5' misread as 'S'. "
+                    "If correcting known OCR patterns produces an exact Employee ID "
+                    "match with the HR record, confidence must be boosted by +0.15."
+                ),
+                "match_threshold": 0.80,
+                "escalation_threshold": 0.45,
                 "active": True,
-                "metadata": {"owner": "OperationsTeam", "version": "1.3"},
+                "metadata": {"owner": "DocumentProcessingTeam", "version": "2.0"},
             },
             {
-                "policy_id": "POL-003",
-                "description": "Reject records where DNI normalization produced no digits",
+                "rule_number": 3,
+                "title": "High Practice Score - Strict Identity Enforcement",
+                "description": (
+                    "If a candidate's practice_score is greater than 75%, "
+                    "strict identity matching must be enforced. Both Employee ID "
+                    "and full name (post-normalization) must align. A confidence "
+                    "score below 0.90 for high-scoring candidates is insufficient "
+                    "for auto-approval and must trigger an escalation workflow."
+                ),
+                "match_threshold": 0.90,
+                "escalation_threshold": 0.70,
+                "active": True,
+                "metadata": {"owner": "CertificationIntegrityBoard", "version": "1.5"},
+            },
+            {
+                "rule_number": 4,
+                "title": "Corrupted Record Escalation Protocol",
+                "description": (
+                    "Any record where Employee ID normalization produces an empty "
+                    "string, contains special characters only, or matches the "
+                    "pattern '%%*%%' must be immediately flagged as UNRESOLVABLE. "
+                    "These records must not be passed to the reasoning layer and "
+                    "must be routed to the DataGovernance escalation queue."
+                ),
                 "match_threshold": 0.00,
                 "escalation_threshold": 0.00,
                 "active": True,
-                "metadata": {"owner": "DataGovernance", "version": "1.0"},
+                "metadata": {"owner": "DataGovernance", "version": "1.2"},
             },
             {
-                "policy_id": "POL-004",
-                "description": "Cross-validate certification level against enrolled cohort",
-                "match_threshold": 0.90,
-                "escalation_threshold": 0.60,
-                "active": False,  # Staged rollout - inactive in dev
-                "metadata": {"owner": "AcademicRegistry", "version": "0.9-beta"},
+                "rule_number": 5,
+                "title": "Name Whitespace and Casing Normalization",
+                "description": (
+                    "All name fields must undergo NFKD unicode normalization, "
+                    "diacritic stripping, whitespace collapsing, and title-casing "
+                    "before comparison. Two names that produce the same normalized "
+                    "string are considered identical regardless of the original "
+                    "source format. Abbreviated middle names (e.g., 'N.' vs 'Nicolas') "
+                    "must not reduce confidence below 0.85 when Employee ID matches exactly."
+                ),
+                "match_threshold": 0.85,
+                "escalation_threshold": 0.50,
+                "active": True,
+                "metadata": {"owner": "DataGovernance", "version": "2.3"},
+            },
+            {
+                "rule_number": 6,
+                "title": "Baseline Clean Record Validation",
+                "description": (
+                    "Records where Employee ID, certification target, practice score, "
+                    "and exam registration ID are all identical across both sources "
+                    "qualify as a CLEAN MATCH and must receive a confidence score "
+                    "of 0.97 or higher. No manual review is required for clean matches."
+                ),
+                "match_threshold": 0.97,
+                "escalation_threshold": 0.85,
+                "active": True,
+                "metadata": {"owner": "AutomationTeam", "version": "1.0"},
             },
         ]
     }
 
-    _CERTIFICATION_RULES = [
-        "A student may only hold one active enrollment per simulation lab at a time.",
-        "Certification level must be validated against the official cohort roster (CRT-L1 through CRT-L4).",
-        "Records flagged for manual review must be resolved within 48 business hours.",
-        "DNI normalization failures automatically trigger an escalation workflow in Dataverse.",
-        "Confidence scores below 0.50 are classified as UNRESOLVABLE and routed to DataGovernance.",
+    _DOMAIN_POLICIES = [
+        "POL-ENT-01: An employee may hold only one active exam registration per certification track per quarter.",
+        "POL-ENT-02: Certification validations sourced from SYS-LEGACY-IMPORT require dual-source confirmation.",
+        "POL-ENT-03: Escalated records must be resolved within 48 business hours by the DataGovernance team.",
+        "POL-ENT-04: Practice scores below 60% do not qualify for expedited exam registration.",
+        "POL-ENT-05: All resolved identities are written back to Dataverse with a full reasoning audit trail.",
     ]
 
     _SOURCE_TRUST: dict[str, float] = {
-        "SYS-CLASSROOM-TERMINAL": 0.95,
-        "SYS-ADMIN-PORTAL": 0.90,
-        "SYS-SCHEDULING": 0.85,
-        "SYS-LEGACY-IMPORT": 0.60,
-        "SYS-MANUAL-ENTRY": 0.50,
+        "SYS-HR-DATABASE":  0.95,
+        "SYS-MSLEARN":      0.90,
+        "SYS-CERT-UPLOAD":  0.80,
+        "SYS-MANUAL-ENTRY": 0.65,
+        "SYS-OCR-SCANNER":  0.60,
+        "SYS-LEGACY-IMPORT": 0.45,
     }
 
     def __init__(self, environment: str = "dev") -> None:
@@ -167,40 +265,32 @@ class FoundryIQConnector:
         )
 
     def fetch_audit_context(self) -> AuditContext:
-        """Retrieve the active audit context from Foundry IQ.
-
-        Fetches policy directives, certification rules, and source system
-        trust scores applicable to the current reconciliation run.
+        """Retrieve the grounded audit context from Foundry IQ.
 
         Returns:
-            AuditContext populated with active policies and rules.
+            AuditContext populated with rules, policies, and trust scores.
 
         Raises:
-            KeyError: If the environment tag has no registered fixtures.
-
-        Example:
-            >>> context = connector.fetch_audit_context()
-            >>> context.policies[0].policy_id
-            'POL-001'
+            KeyError: If the environment has no registered fixtures.
         """
-        raw_policies = self._POLICY_FIXTURES.get(self._environment)
-        if raw_policies is None:
+        raw_rules = self._RULE_FIXTURES.get(self._environment)
+        if raw_rules is None:
             raise KeyError(
-                f"No policy fixtures registered for environment '{self._environment}'. "
-                f"Available: {list(self._POLICY_FIXTURES.keys())}"
+                f"No fixtures registered for environment '{self._environment}'. "
+                f"Available: {list(self._RULE_FIXTURES.keys())}"
             )
 
-        policies = [ReconciliationPolicy(**p) for p in raw_policies]
-        active_count = sum(1 for p in policies if p.active)
+        rules = [AuditRule(**r) for r in raw_rules]
+        active_count = sum(1 for r in rules if r.active)
 
         logger.info(
-            "Foundry IQ context loaded | total_policies=%d | active=%d",
-            len(policies),
+            "Foundry IQ context loaded | total_rules=%d | active=%d",
+            len(rules),
             active_count,
         )
 
         return AuditContext(
-            policies=policies,
-            certification_rules=self._CERTIFICATION_RULES,
+            rules=rules,
+            domain_policies=self._DOMAIN_POLICIES,
             source_system_trust=self._SOURCE_TRUST,
         )
