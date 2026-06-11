@@ -126,6 +126,44 @@ class DataNormalizer:
         return normalized if normalized else None
 
     # ------------------------------------------------------------------
+    # Employee ID Normalization
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def normalize_employee_id(raw: Optional[str]) -> Optional[str]:
+        """Normalize an Employee ID to a flat uppercase alphanumeric string.
+
+        Strips hyphens, underscores, whitespace, and any other non-alphanumeric
+        character so that cross-classroom format variants - such as "EMP-7721"
+        from SYS-FORM-AULA-A versus "EMP7721" from SYS-FORM-AULA-B - reduce to
+        the same identifier before pairing. This implements the comparison
+        rule defined by Foundry IQ Audit Rule #5 (Employee ID Cross-System
+        Normalization).
+
+        Args:
+            raw: Raw Employee ID string as received from a classroom or HR
+                 source system. Examples: "EMP-7721", "EMP7721", "   ".
+
+        Returns:
+            Uppercase alphanumeric string, or None if the input is empty,
+            non-string, or reduces to an empty sequence after stripping
+            (e.g. whitespace-only or symbol-only placeholders).
+
+        Example:
+            >>> DataNormalizer.normalize_employee_id("EMP-7721")
+            'EMP7721'
+            >>> DataNormalizer.normalize_employee_id("EMP7721")
+            'EMP7721'
+            >>> DataNormalizer.normalize_employee_id("   ")
+            None
+        """
+        if not raw or not isinstance(raw, str):
+            return None
+
+        cleaned = re.sub(r"[^a-zA-Z0-9]", "", raw).upper()
+        return cleaned if cleaned else None
+
+    # ------------------------------------------------------------------
     # Record-level Normalization
     # ------------------------------------------------------------------
 
@@ -133,27 +171,28 @@ class DataNormalizer:
     def normalize_record(record: dict) -> dict:
         """Apply full normalization pipeline to a raw ingestion record.
 
-        Processes the `dni` and `name` fields in place and enriches the
-        record with a `dni_hash` field for downstream deduplication.
-        Unrecognized fields are passed through untouched.
+        Processes the `employee_id`, `dni`, and `name` fields in place and
+        enriches the record with a `dni_hash` field for downstream
+        deduplication. Unrecognized fields are passed through untouched.
 
         Args:
-            record: Raw dict from a source system. Expected keys:
-                    - `dni` (str): Raw DNI value.
+            record: Raw dict from a source system. Recognized keys:
+                    - `employee_id` (str): Raw Employee ID, any format.
+                    - `dni` (str): Raw DNI value (legacy field, optional).
                     - `name` (str): Raw full name.
                     Any additional keys are preserved as-is.
 
         Returns:
-            Enriched dict with normalized `dni`, `name`, and new
-            `dni_hash` field. A `_normalization_errors` list is appended
+            Enriched dict with normalized `employee_id`, `dni`, `name`, and
+            new `dni_hash` field. A `_normalization_errors` list is appended
             if any field could not be processed.
 
         Raises:
             NormalizationError: If `record` is not a dict.
 
         Example:
-            >>> DataNormalizer.normalize_record({"dni": "12.345.678", "name": "GARCIA juan"})
-            {'dni': '12345678', 'name': 'Garcia Juan', 'dni_hash': '...', '_normalization_errors': []}
+            >>> DataNormalizer.normalize_record({"employee_id": "EMP-7721", "name": "VEGA, tomas"})
+            {'employee_id': 'EMP7721', 'name': 'Vega Tomas', 'dni': None, 'dni_hash': None, '_normalization_errors': []}
         """
         if not isinstance(record, dict):
             raise NormalizationError(
@@ -162,6 +201,16 @@ class DataNormalizer:
 
         result = record.copy()
         errors: list[str] = []
+
+        # Normalize Employee ID
+        if "employee_id" in result:
+            raw_employee_id = result.get("employee_id")
+            normalized_employee_id = DataNormalizer.normalize_employee_id(raw_employee_id)
+            if normalized_employee_id is None and raw_employee_id is not None:
+                errors.append(
+                    f"employee_id: could not normalize value '{raw_employee_id}'"
+                )
+            result["employee_id"] = normalized_employee_id
 
         # Normalize DNI
         raw_dni = result.get("dni")
