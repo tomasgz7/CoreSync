@@ -1,19 +1,20 @@
-# Entornos virtuales
-.venv/
-venv/
-env/
+# Environment & secrets
+.env
+.env.*
+!env.example
+!env.production.example
 
-# Archivos de Python compilados
+# Python
 __pycache__/
 *.pyc
+.venv/
+venv/
 
-# Archivos de configuración y secretos
-.env
-.env.local
+# CoreSync runtime artifacts
+coresync.log
+data/output_segmentado.json
+data/outreach_logs.json
+data/manager_insights.json
 
-# IDEs
-.vscode/
-.idea/
-
-# Carpetas de datos temporales
-data/raw/
+# OS
+.DS_Store

@@ -1,0 +1,7 @@
+# CoreSync - Runtime Dependencies
+# Required for LIVE mode (Azure OpenAI Reasoning Agent).
+# --dry-run mode does not call these libraries' network features,
+# but they must be importable for agent/main.py and agent/resolver.py to load.
+
+openai>=1.30.0
+python-dotenv>=1.0.1
