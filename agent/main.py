@@ -8,7 +8,9 @@ Execution Phases:
   [Phase 1] Synthetic Data Ingestion & Curation
   [Phase 2] Foundry IQ Context Retrieval & Injection
   [Phase 3] Multi-Agent Reasoning & Rule Application with Citations
-  [Phase 4] Segmentation, Action Dispatch & Audit Report Generation
+  [Phase 4] Segmentation & Action Dispatch
+  [Phase 5] Contextual Engagement - Work IQ Outreach Planning
+  [Phase 6] Manager Insights & Executive Audit Report
 
 Usage:
     python agent/main.py --dry-run     # Full simulation, no Azure API calls
@@ -33,6 +35,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from agent.normalizer import DataNormalizer                          # noqa: E402
 from agent.resolver import DataResolver, ResolutionResult            # noqa: E402
 from agent.segmenter import DataSegmenter, SegmentationReport        # noqa: E402
+from agent.engagement import ContextualEngagementAgent, OutreachLog  # noqa: E402
+from agent.insights import ManagerInsightsAgent, ExecutiveInsightsReport  # noqa: E402
 from connectors.foundry import AuditContext, FoundryIQConnector      # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -70,7 +74,7 @@ def _subheader(title: str) -> None:
 
 def _field(label: str, value: Any, indent: int = 4) -> None:
     pad = " " * indent
-    print(f"{pad}{label:<28}: {value}")
+    print(f"{pad}{label:<32}: {value}")
 
 
 def _wrap(text: str, width: int = 64, indent: int = 6) -> str:
@@ -341,13 +345,9 @@ def print_pair_result(
         print(_wrap(result.error, width=66, indent=6))
 
 
-def print_phase4(
-    report: SegmentationReport,
-    dry_run: bool,
-    output_path: Path,
-) -> None:
+def print_phase4(report: SegmentationReport, output_path: Path) -> None:
     _header(
-        "PHASE 4 - Segmentation, Action Dispatch & Audit Report",
+        "PHASE 4 - Segmentation & Action Dispatch",
         "DATA SEGMENTER & ENTERPRISE AGENT"
     )
 
@@ -371,7 +371,7 @@ def print_phase4(
                   f"confidence: {rec.confidence_index:.4f} | {rec.grounded_citation}")
 
     if report.ausentes:
-        _subheader("Ausentes - Engagement Queue Routing")
+        _subheader("Ausentes - Flagged for Engagement")
         for rec in report.ausentes:
             print(f"    {rec.employee_id:<12} | severity: {rec.severity_flag:<25} | "
                   f"{rec.grounded_citation}")
@@ -382,19 +382,91 @@ def print_phase4(
             print(f"    {rec.employee_id:<12} | severity: {rec.severity_flag:<25} | "
                   f"{rec.grounded_citation}")
 
-    success_rate = (
-        (len(report.presentes) + len(report.ausentes)) / total * 100
-        if total else 0.0
+    print()
+    _field("Segmentation artifact", str(output_path))
+
+
+def print_phase5(logs: list[OutreachLog], output_path: Path) -> None:
+    _header(
+        "PHASE 5 - Contextual Engagement: Work IQ Outreach Planning",
+        "CONTEXTUAL ENGAGEMENT AGENT"
     )
 
     print()
-    _field("Pipeline success rate", f"{success_rate:.1f}%")
-    _field("Report artifact", str(output_path))
+    _field("Ausentes records evaluated", len(logs))
+
+    if not logs:
+        print("\n  No records routed to the Engagement Agent in this run.")
+        _field("Outreach artifact", str(output_path))
+        return
+
+    for log in logs:
+        print(f"\n  Employee: {log.employee_id}  |  "
+              f"Certification: {log.certification_target}  |  "
+              f"Severity: {log.severity_flag}")
+        print(f"  {DLINE[:68]}")
+        _field("Delivery channel", log.delivery_channel)
+        _field("Optimal window", log.optimal_window)
+        _field("M365 status considered", log.m365_status_considered)
+        _field("Message tone", log.message_tone)
+        print()
+        print("    Work IQ Reasoning:")
+        print(_wrap(log.reasoning, width=66, indent=6))
+
+    print()
+    _field("Outreach artifact", str(output_path))
+
+
+def print_phase6(insights: ExecutiveInsightsReport, output_path: Path) -> None:
+    _header(
+        "PHASE 6 - Manager Insights & Executive Audit Report",
+        "MANAGER INSIGHTS AGENT"
+    )
+
+    print()
+    print("  [ NOTE: All metrics below are PII-abstracted aggregates. ]")
+    print("  [ No individual employee identifiers appear in this report. ]")
+
+    _subheader("Workforce Readiness Summary")
+    _field("Total cohort size", insights.total_cohort_size)
+    _field("Attendance verified (Presentes)", insights.attendance_verified_count)
+    _field("Absenteeism count (Ausentes)", insights.absenteeism_count)
+    _field("Unresolved count (Sin_Respuesta)", insights.unresolved_count)
+    _field("Absenteeism rate", f"{insights.absenteeism_rate:.1%}")
+    _field("Escalation rate", f"{insights.escalation_rate:.1%}")
+    _field("Overall readiness index", f"{insights.overall_readiness_index:.1%}")
+
+    if insights.certification_breakdown:
+        _subheader("Certification Readiness Breakdown")
+        for c in insights.certification_breakdown:
+            print(
+                f"    {c.certification_target:<14} | "
+                f"candidates: {c.total_candidates:>2} | "
+                f"present: {c.verified_present:>2} | "
+                f"at_risk: {c.at_risk:>2} | "
+                f"unresolved: {c.unresolved:>2} | "
+                f"readiness: {c.readiness_index:.1%}"
+            )
+
+    if insights.severity_distribution:
+        _subheader("Severity Flag Distribution")
+        for flag, count in insights.severity_distribution.items():
+            print(f"    {flag:<28}: {count}")
+
+    _subheader("Engagement Queue Summary")
+    _field("Total queued for outreach", insights.engagement_queue_size)
+    for channel, count in insights.engagement_channel_distribution.items():
+        _field(f"  -> {channel}", count, indent=6)
+
+    _field("Operational report latency", f"{insights.operational_report_latency_seconds:.6f}s")
+    _field("Insights artifact", str(output_path))
 
     print(f"\n{LINE}")
     print("  CoreSync pipeline complete.")
-    print(f"  All resolved identities ready for Dataverse ingestion.")
-    print(f"  Escalated records routed to DataGovernance queue.")
+    print("  All resolved identities ready for Dataverse ingestion.")
+    print("  Escalated records routed to DataGovernance queue.")
+    print("  Outreach logs queued for Teams/Outlook dispatch.")
+    print("  Executive insights ready for Power BI / Fabric IQ consumption.")
     print(f"{LINE}\n")
 
 
@@ -418,9 +490,17 @@ def main() -> None:
         default=PROJECT_ROOT / "data" / "synthetic_records.json",
         help="Path to the input JSON records file.",
     )
+    parser.add_argument(
+        "--signals",
+        type=Path,
+        default=PROJECT_ROOT / "data" / "work_activity_signals.json",
+        help="Path to the Work IQ activity signals JSON file.",
+    )
     args = parser.parse_args()
 
-    output_path = PROJECT_ROOT / "data" / "output_segmentado.json"
+    segmentation_output = PROJECT_ROOT / "data" / "output_segmentado.json"
+    outreach_output = PROJECT_ROOT / "data" / "outreach_logs.json"
+    insights_output = PROJECT_ROOT / "data" / "manager_insights.json"
 
     # Banner
     print(f"\n{LINE}")
@@ -473,8 +553,20 @@ def main() -> None:
         execution_mode="DRY_RUN_SIMULATION" if args.dry_run else "LIVE"
     )
     report = segmenter.segment(pairs, results)
-    segmenter.write_report(report, output_path)
-    print_phase4(report, args.dry_run, output_path)
+    segmenter.write_report(report, segmentation_output)
+    print_phase4(report, segmentation_output)
+
+    # --- Phase 5: Contextual Engagement Agent ---
+    engagement_agent = ContextualEngagementAgent(signals_path=args.signals)
+    outreach_logs = engagement_agent.process(report.ausentes)
+    engagement_agent.write_logs(outreach_logs, outreach_output)
+    print_phase5(outreach_logs, outreach_output)
+
+    # --- Phase 6: Manager Insights Agent ---
+    insights_agent = ManagerInsightsAgent()
+    insights = insights_agent.generate(report, outreach_logs)
+    insights_agent.write_report(insights, insights_output)
+    print_phase6(insights, insights_output)
 
 
 if __name__ == "__main__":
