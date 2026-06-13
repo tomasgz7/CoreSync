@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CoreSync — Attendance Governance Audit Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#14171C; --bg-panel:#1B1F26; --bg-line:#2A2F38;
+    --paper:#FAF6EC; --paper-2:#F0EADA; --line:#DCD4BD;
+    --ink:#2B2722; --ink-soft:#7A7363;
+    --cream:#ECE8DD; --cream-soft:#8B8A82;
+    --green:#2F8F5B; --green-bg:#E3F1E8;
+    --amber:#B5790F; --amber-bg:#FBF0DC;
+    --red:#BD4332; --red-bg:#FBE8E3;
+    --serif:'Source Serif 4', serif;
+    --sans:'IBM Plex Sans', sans-serif;
+    --mono:'IBM Plex Mono', monospace;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    background:var(--bg); color:var(--cream); font-family:var(--sans);
+    line-height:1.5; padding:24px; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{ max-width:1180px; margin:0 auto; }
+
+  /* ---------- Masthead ---------- */
+  .masthead{
+    border:1px solid var(--bg-line); border-radius:10px; padding:24px 28px;
+    margin-bottom:20px; background:var(--bg-panel);
+    display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-end; gap:16px;
+  }
+  .masthead h1{
+    font-family:var(--serif); font-weight:600; font-size:30px; letter-spacing:.01em;
+  }
+  .masthead .subtitle{
+    font-family:var(--mono); font-size:12px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--cream-soft); margin-top:4px;
+  }
+  .meta{ text-align:right; font-family:var(--mono); font-size:12px; color:var(--cream-soft); }
+  .meta .pipeline-id{ color:var(--cream); margin-bottom:4px; }
+  .badge{
+    display:inline-block; font-family:var(--mono); font-size:11px; letter-spacing:.08em;
+    text-transform:uppercase; padding:3px 10px; border-radius:4px; margin-top:6px;
+    border:1px solid currentColor;
+  }
+  .badge.dry-run{ color:var(--amber); }
+  .badge.live{ color:var(--green); }
+  .badge.sample{ color:var(--cream-soft); }
+
+  /* ---------- Metric strip ---------- */
+  .metrics{
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; margin-bottom:24px;
+  }
+  .metric{
+    background:var(--bg-panel); border:1px solid var(--bg-line); border-radius:10px;
+    padding:18px 20px;
+  }
+  .metric .label{
+    font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--cream-soft); margin-bottom:8px;
+  }
+  .metric .value{ font-family:var(--serif); font-size:34px; font-weight:600; }
+  .metric .sub{ font-family:var(--mono); font-size:12px; color:var(--cream-soft); margin-top:4px; }
+
+  /* ---------- Section headers ---------- */
+  .section-title{
+    font-family:var(--mono); font-size:12px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--cream-soft); margin:32px 0 14px; display:flex; align-items:center; gap:12px;
+  }
+  .section-title::after{ content:''; flex:1; height:1px; background:var(--bg-line); }
+
+  /* ---------- Docket (3 columns) ---------- */
+  .docket{ display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; }
+  .docket-col-head{
+    font-family:var(--sans); font-weight:500; font-size:14px; margin-bottom:10px;
+    display:flex; justify-content:space-between; align-items:center;
+    padding-bottom:8px; border-bottom:1px solid var(--bg-line);
+  }
+  .docket-col-head .count{ font-family:var(--mono); color:var(--cream-soft); font-size:12px; }
+  .docket-col[data-seg="presentes"] .docket-col-head{ color:var(--green); }
+  .docket-col[data-seg="ausentes"] .docket-col-head{ color:var(--amber); }
+  .docket-col[data-seg="sin_respuesta"] .docket-col-head{ color:var(--red); }
+
+  /* ---------- Case card (paper) ---------- */
+  .case{
+    background:var(--paper); color:var(--ink); border-radius:6px;
+    padding:16px 18px; margin-bottom:14px; position:relative;
+    border:1px solid var(--line);
+  }
+  .case .case-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:6px; }
+  .case .emp-id{ font-family:var(--mono); font-weight:500; font-size:14px; }
+  .case .cert-chip{
+    font-family:var(--mono); font-size:11px; letter-spacing:.04em; color:var(--ink-soft);
+    background:var(--paper-2); border-radius:4px; padding:2px 8px; white-space:nowrap;
+  }
+  .case .name{ font-size:14px; margin-bottom:10px; }
+  .case .row{
+    display:flex; justify-content:space-between; font-size:12px; color:var(--ink-soft);
+    padding:4px 0; border-top:1px solid var(--line);
+  }
+  .case .row .v{ font-family:var(--mono); color:var(--ink); }
+  .case .action{
+    font-family:var(--mono); font-size:11px; margin-top:10px; padding-top:8px;
+    border-top:1px solid var(--line); color:var(--ink-soft);
+  }
+  .case .action .arrow{ color:var(--ink); }
+
+  /* ---------- Audit stamp (signature element) ---------- */
+  .stamps{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .stamp{
+    display:inline-block; font-family:var(--mono); font-size:10.5px; letter-spacing:.06em;
+    text-transform:uppercase; padding:5px 9px; border-radius:3px;
+    border:1.5px double currentColor; transform:rotate(-1.5deg);
+    background:transparent; white-space:nowrap;
+  }
+  .docket-col[data-seg="presentes"] .stamp{ color:var(--green); }
+  .docket-col[data-seg="ausentes"] .stamp{ color:var(--amber); }
+  .docket-col[data-seg="sin_respuesta"] .stamp{ color:var(--red); }
+
+  /* ---------- Engagement memo ---------- */
+  .memo{
+    background:var(--paper); color:var(--ink); border-radius:6px; border:1px solid var(--line);
+    padding:18px 20px; margin-bottom:14px;
+  }
+  .memo-head{ display:flex; flex-wrap:wrap; gap:14px; margin-bottom:10px; align-items:baseline; }
+  .memo-head .emp-id{ font-family:var(--mono); font-weight:500; font-size:14px; }
+  .memo-head .cert-chip{
+    font-family:var(--mono); font-size:11px; color:var(--ink-soft);
+    background:var(--paper-2); border-radius:4px; padding:2px 8px;
+  }
+  .memo-grid{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:10px;
+    margin-bottom:12px;
+  }
+  .memo-grid .field .k{
+    font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink-soft); margin-bottom:2px;
+  }
+  .memo-grid .field .v{ font-size:13px; font-weight:500; }
+  .memo-reasoning{
+    font-size:13px; color:var(--ink-soft); line-height:1.6; border-top:1px solid var(--line);
+    padding-top:10px;
+  }
+  .memo-reasoning .cite{
+    font-family:var(--mono); color:var(--amber); font-weight:500;
+  }
+  .memo-empty{
+    font-family:var(--mono); font-size:13px; color:var(--cream-soft);
+    padding:20px; text-align:center; border:1px dashed var(--bg-line); border-radius:6px;
+  }
+
+  /* ---------- Readiness bars ---------- */
+  .readiness{ background:var(--bg-panel); border:1px solid var(--bg-line); border-radius:10px; padding:18px 20px; }
+  .ready-row{ display:flex; align-items:center; gap:14px; padding:8px 0; }
+  .ready-row + .ready-row{ border-top:1px solid var(--bg-line); }
+  .ready-row .track{
+    font-family:var(--mono); font-size:13px; width:120px; flex-shrink:0;
+  }
+  .ready-row .bar-bg{
+    flex:1; height:10px; background:var(--bg-line); border-radius:5px; overflow:hidden;
+  }
+  .ready-row .bar-fill{
+    height:100%; border-radius:5px; background:var(--green);
+  }
+  .ready-row .pct{ font-family:var(--mono); font-size:13px; width:48px; text-align:right; flex-shrink:0; }
+  .ready-row .detail{
+    font-family:var(--mono); font-size:11px; color:var(--cream-soft); width:140px;
+    text-align:right; flex-shrink:0;
+  }
+
+  /* ---------- Severity distribution ---------- */
+  .severity-wrap{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  .severity-pill{
+    font-family:var(--mono); font-size:11px; padding:6px 12px; border-radius:5px;
+    border:1px solid var(--bg-line); color:var(--cream-soft);
+  }
+  .severity-pill .n{ color:var(--cream); font-weight:500; margin-right:6px; }
+
+  /* ---------- Footer ---------- */
+  .footer{
+    margin-top:32px; border:1px solid var(--bg-line); border-radius:10px;
+    background:var(--bg-panel); padding:18px 22px; display:flex; flex-wrap:wrap;
+    justify-content:space-between; align-items:center; gap:16px;
+  }
+  .footer .disclaimer{
+    font-family:var(--mono); font-size:11.5px; color:var(--cream-soft); line-height:1.6;
+    max-width:760px;
+  }
+  .footer .disclaimer strong{ color:var(--amber); }
+  .footer a{ color:var(--green); text-decoration:none; font-family:var(--mono); font-size:12px; }
+  .footer a:hover{ text-decoration:underline; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width:860px){
+    .metrics{ grid-template-columns:1fr; }
+    .docket{ grid-template-columns:1fr; }
+    .ready-row{ flex-wrap:wrap; }
+    .ready-row .detail{ width:auto; text-align:left; }
+    .meta{ text-align:left; }
+    .masthead{ flex-direction:column; align-items:flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div>
+      <h1>CoreSync</h1>
+      <div class="subtitle">Attendance Governance — Audit Console</div>
+    </div>
+    <div class="meta">
+      <div class="pipeline-id" id="meta-pipeline">—</div>
+      <div id="meta-timestamp">—</div>
+      <div id="meta-mode" class="badge dry-run">—</div>
+      <div id="meta-source" class="badge sample" style="margin-left:6px;">—</div>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="label">Overall Readiness Index</div>
+      <div class="value" id="m-readiness">—</div>
+      <div class="sub" id="m-readiness-sub">—</div>
+    </div>
+    <div class="metric">
+      <div class="label">Absenteeism Rate</div>
+      <div class="value" id="m-absenteeism">—</div>
+      <div class="sub" id="m-absenteeism-sub">—</div>
+    </div>
+    <div class="metric">
+      <div class="label">Escalation Rate</div>
+      <div class="value" id="m-escalation">—</div>
+      <div class="sub" id="m-escalation-sub">—</div>
+    </div>
+  </div>
+
+  <div class="section-title">Segmentation Docket — Presentes / Ausentes / Sin Respuesta</div>
+  <div class="docket" id="docket"></div>
+
+  <div class="section-title">Engagement Queue — Work IQ Outreach Planning</div>
+  <div id="engagement"></div>
+
+  <div class="section-title">Certification Readiness Breakdown</div>
+  <div class="readiness">
+    <div id="readiness-rows"></div>
+    <div class="severity-wrap" id="severity-rows"></div>
+  </div>
+
+  <div class="footer">
+    <div class="disclaimer">
+      <strong>Synthetic data disclaimer.</strong> Every identifier, name, score, and timestamp
+      shown above is fabricated for the Microsoft Agents League Hackathon 2026. No personally
+      identifiable information, no real employees, no real attendance or certification records.
+      All artifacts are marked <span style="color:var(--green)">pii_abstracted: true</span> at generation.
+    </div>
+    <a href="https://github.com" target="_blank" rel="noopener">github.com/your-username/coresync ↗</a>
+  </div>
+
+</div>
+
+<script>
+const SAMPLE = {
+  segmentation: {
+    generation_metadata: {
+      pipeline_id: "CoreSync-SimulationCenter-Run",
+      timestamp: "2026-06-13T18:42:07.123456+00:00",
+      total_processed_pairs: 3,
+      execution_mode: "DRY_RUN_SIMULATION"
+    },
+    segmentacion_matricula: {
+      Presentes: [{
+        employee_id: "EMP7721", name: "Vega Tomas Nicolas",
+        certification_target: "AZ-204-SIM", attendance_verified: true,
+        confidence_index: 0.98, severity_flag: "NONE",
+        action_triggered: "EMIT_MICRO_CREDENTIAL_API_V1",
+        grounded_citation: "[Grounded on: Audit Rule #3, Audit Rule #5]"
+      }],
+      Ausentes: [{
+        employee_id: "EMP9014", name: "Ramirez Sandra M",
+        certification_target: "AI-102-SIM", attendance_verified: false,
+        confidence_index: 0.90, severity_flag: "HIGH_SKILL_GAP_RISK",
+        action_triggered: "ROUTE_TO_ENGAGEMENT_QUEUE",
+        grounded_citation: "[Grounded on: Audit Rule #1, Audit Rule #2]"
+      }],
+      Sin_Respuesta: [{
+        employee_id: "EMP4412", name: "Unknown Participant",
+        certification_target: "DP-300-SIM", attendance_verified: false,
+        confidence_index: 1.0, severity_flag: "DATA_GOVERNANCE_ESCALATION",
+        action_triggered: "ISOLATE_IN_CRITICAL_LOG",
+        grounded_citation: "[Grounded on: Audit Rule #4]"
+      }]
+    }
+  },
+  outreach: [{
+    employee_id: "EMP9014", certification_target: "AI-102-SIM",
+    severity_flag: "HIGH_SKILL_GAP_RISK", delivery_channel: "Outlook_Digest",
+    optimal_window: "Friday_Afternoon", m365_status_considered: "InAMeeting",
+    message_tone: "Low-Intrusion - Deferred Reminder",
+    reasoning: "Employee EMP9014 has workload_stress_index=HIGH with 26h of weekly meetings (6h focus time available). Per Audit Rule #2 - Workload Anomaly Allowance, immediate notification is suppressed. Outreach deferred to the employee's declared preferred slot: Friday_Afternoon, delivered as a low-priority Outlook digest to respect cognitive load boundaries while preserving certification deadline alignment."
+  }],
+  insights: {
+    generation_metadata: {
+      pipeline_id: "CoreSync-SimulationCenter-Run",
+      timestamp: "2026-06-13T18:42:07.234567+00:00",
+      execution_mode: "DRY_RUN_SIMULATION",
+      operational_report_latency_seconds: 0.000041,
+      pii_abstracted: true
+    },
+    workforce_readiness_summary: {
+      total_cohort_size: 3, attendance_verified_count: 1,
+      absenteeism_count: 1, unresolved_count: 1,
+      absenteeism_rate: 0.3333, escalation_rate: 0.3333,
+      overall_readiness_index: 0.3333
+    },
+    certification_breakdown: [
+      { certification_target: "AI-102-SIM", total_candidates: 1, verified_present: 0, at_risk: 1, unresolved: 0, readiness_index: 0.0 },
+      { certification_target: "AZ-204-SIM", total_candidates: 1, verified_present: 1, at_risk: 0, unresolved: 0, readiness_index: 1.0 },
+      { certification_target: "DP-300-SIM", total_candidates: 1, verified_present: 0, at_risk: 0, unresolved: 1, readiness_index: 0.0 }
+    ],
+    severity_distribution: { HIGH_SKILL_GAP_RISK: 1, DATA_GOVERNANCE_ESCALATION: 1 },
+    engagement_summary: { queue_size: 1, channel_distribution: { Outlook_Digest: 1 } }
+  }
+};
+
+async function tryFetch(path) {
+  try {
+    const res = await fetch(path, { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+function pct(x) {
+  return Math.round(x * 1000) / 10 + "%";
+}
+
+function renderStamps(citation) {
+  const inner = citation.replace(/^\[Grounded on:\s*/i, "").replace(/\]$/, "");
+  return inner.split(",").map(r => `<span class="stamp">${r.trim()}</span>`).join("");
+}
+
+function renderCaseCard(rec, seg) {
+  const labels = {
+    presentes: { action: "Micro-credential issued", arrow: "→" },
+    ausentes: { action: "Routed to engagement queue", arrow: "→" },
+    sin_respuesta: { action: "Isolated · DataGovernance review", arrow: "⚑" }
+  };
+  const l = labels[seg];
+  let extraRow = "";
+  if (seg === "ausentes" || seg === "sin_respuesta") {
+    extraRow = `<div class="row"><span>Severity</span><span class="v">${rec.severity_flag}</span></div>`;
+  }
+  return `
+    <div class="case">
+      <div class="case-top">
+        <span class="emp-id">${rec.employee_id}</span>
+        <span class="cert-chip">${rec.certification_target}</span>
+      </div>
+      <div class="name">${rec.name}</div>
+      <div class="row"><span>Confidence index</span><span class="v">${rec.confidence_index.toFixed(2)}</span></div>
+      ${extraRow}
+      <div class="action"><span class="arrow">${l.arrow}</span> ${l.action}</div>
+      <div class="stamps">${renderStamps(rec.grounded_citation)}</div>
+    </div>`;
+}
+
+function renderDocket(seg) {
+  const cols = [
+    { key: "Presentes", id: "presentes", label: "Presentes" },
+    { key: "Ausentes", id: "ausentes", label: "Ausentes" },
+    { key: "Sin_Respuesta", id: "sin_respuesta", label: "Sin Respuesta" }
+  ];
+  const root = document.getElementById("docket");
+  root.innerHTML = cols.map(c => {
+    const records = seg.segmentacion_matricula[c.key] || [];
+    const cards = records.length
+      ? records.map(r => renderCaseCard(r, c.id)).join("")
+      : `<div class="memo-empty">No records in this segment</div>`;
+    return `
+      <div class="docket-col" data-seg="${c.id}">
+        <div class="docket-col-head">
+          <span>${c.label}</span>
+          <span class="count">${records.length} record${records.length === 1 ? "" : "s"}</span>
+        </div>
+        ${cards}
+      </div>`;
+  }).join("");
+}
+
+function renderEngagement(logs) {
+  const root = document.getElementById("engagement");
+  if (!logs || logs.length === 0) {
+    root.innerHTML = `<div class="memo-empty">No records routed to the Engagement Agent in this run.</div>`;
+    return;
+  }
+  root.innerHTML = logs.map(log => {
+    const reasoning = log.reasoning.replace(
+      /(Audit Rule #\d+[^.,]*)/g,
+      '<span class="cite">$1</span>'
+    );
+    return `
+      <div class="memo">
+        <div class="memo-head">
+          <span class="emp-id">${log.employee_id}</span>
+          <span class="cert-chip">${log.certification_target}</span>
+          <span class="cert-chip">${log.severity_flag}</span>
+        </div>
+        <div class="memo-grid">
+          <div class="field"><div class="k">Channel</div><div class="v">${log.delivery_channel}</div></div>
+          <div class="field"><div class="k">Optimal window</div><div class="v">${log.optimal_window}</div></div>
+          <div class="field"><div class="k">M365 status</div><div class="v">${log.m365_status_considered}</div></div>
+          <div class="field"><div class="k">Message tone</div><div class="v">${log.message_tone}</div></div>
+        </div>
+        <div class="memo-reasoning">${reasoning}</div>
+      </div>`;
+  }).join("");
+}
+
+function renderInsights(insights) {
+  const s = insights.workforce_readiness_summary;
+  document.getElementById("m-readiness").textContent = pct(s.overall_readiness_index);
+  document.getElementById("m-readiness-sub").textContent =
+    `${s.attendance_verified_count} of ${s.total_cohort_size} verified present`;
+
+  document.getElementById("m-absenteeism").textContent = pct(s.absenteeism_rate);
+  document.getElementById("m-absenteeism-sub").textContent =
+    `${s.absenteeism_count} of ${s.total_cohort_size} flagged at-risk`;
+
+  document.getElementById("m-escalation").textContent = pct(s.escalation_rate);
+  document.getElementById("m-escalation-sub").textContent =
+    `${s.unresolved_count} of ${s.total_cohort_size} unresolved · governance queue`;
+
+  const rows = insights.certification_breakdown.map(c => `
+    <div class="ready-row">
+      <span class="track">${c.certification_target}</span>
+      <div class="bar-bg"><div class="bar-fill" style="width:${c.readiness_index * 100}%"></div></div>
+      <span class="pct">${pct(c.readiness_index)}</span>
+      <span class="detail">present ${c.verified_present} · at-risk ${c.at_risk} · unresolved ${c.unresolved}</span>
+    </div>`).join("");
+  document.getElementById("readiness-rows").innerHTML = rows;
+
+  const sev = insights.severity_distribution || {};
+  document.getElementById("severity-rows").innerHTML = Object.entries(sev)
+    .map(([flag, n]) => `<div class="severity-pill"><span class="n">${n}</span>${flag}</div>`)
+    .join("");
+}
+
+async function init() {
+  const [liveSeg, liveOutreach, liveInsights] = await Promise.all([
+    tryFetch("./data/output_segmentado.json"),
+    tryFetch("./data/outreach_logs.json"),
+    tryFetch("./data/manager_insights.json")
+  ]);
+
+  const seg = liveSeg || SAMPLE.segmentation;
+  const outreach = liveOutreach || SAMPLE.outreach;
+  const insights = liveInsights || SAMPLE.insights;
+  const isLive = !!(liveSeg && liveOutreach && liveInsights);
+
+  document.getElementById("meta-pipeline").textContent = seg.generation_metadata.pipeline_id;
+  document.getElementById("meta-timestamp").textContent = seg.generation_metadata.timestamp;
+
+  const modeEl = document.getElementById("meta-mode");
+  modeEl.textContent = seg.generation_metadata.execution_mode;
+  if (seg.generation_metadata.execution_mode !== "DRY_RUN_SIMULATION") {
+    modeEl.classList.remove("dry-run");
+    modeEl.classList.add("live");
+  }
+
+  const srcEl = document.getElementById("meta-source");
+  srcEl.textContent = isLive ? "live data/*.json" : "sample (embedded)";
+  srcEl.className = "badge " + (isLive ? "live" : "sample");
+
+  renderDocket(seg);
+  renderEngagement(outreach);
+  renderInsights(insights);
+}
+
+init();
+</script>
+</body>
+</html>
