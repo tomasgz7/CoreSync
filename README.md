@@ -6,9 +6,9 @@
 
 <br/>
 
-[![Status](https://img.shields.io/badge/status-active-brightgreen?style=for-the-badge)](https://github.com)
-[![Track](https://img.shields.io/badge/track-Reasoning%20Agents-6f42c1?style=for-the-badge&logo=OpenAI&logoColor=white)](https://github.com)
-[![Hackathon](https://img.shields.io/badge/Agents%20League-Hackathon%202026-ff6b35?style=for-the-badge)](https://github.com)
+[![Status](https://img.shields.io/badge/status-active-brightgreen?style=for-the-badge)](https://github.com/tomasgz7/CoreSync)
+[![Track](https://img.shields.io/badge/track-Reasoning%20Agents-6f42c1?style=for-the-badge&logo=OpenAI&logoColor=white)](https://github.com/tomasgz7/CoreSync)
+[![Hackathon](https://img.shields.io/badge/Agents%20League-Hackathon%202026-ff6b35?style=for-the-badge)](https://github.com/tomasgz7/CoreSync)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Azure OpenAI](https://img.shields.io/badge/Azure%20OpenAI-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white)](https://azure.microsoft.com)
 [![Microsoft Foundry](https://img.shields.io/badge/Microsoft%20Foundry%20IQ-5C2D91?style=for-the-badge&logo=microsoft&logoColor=white)](https://microsoft.com)
@@ -318,6 +318,10 @@ Microsoft Entra ID Managed Identity with explicit RBAC role assignments:
 This eliminates static secrets from the deployment surface entirely - a credential leak from
 the container image or registry cannot expose a usable API key, because none exists.
 
+Furthermore, CoreSync is fully compliant with GitHub Secret Protection and Push Protection
+policies, ensuring no tokens, credentials, or private API keys can ever be accidentally
+committed to the repository.
+
 ### State Persistence for Long-Running Reconciliation
 
 Bulk reconciliation runs across large cohorts may require sequential processing that exceeds a
@@ -354,7 +358,7 @@ import `openai` and `python-dotenv` at module level (required for `LIVE` mode), 
 lightweight packages must be installed even for the dry-run:
 
 ```bash
-git clone https://github.com/your-username/coresync.git
+git clone https://github.com/tomasgz7/CoreSync.git
 cd coresync
 pip install -r requirements.txt
 ```
@@ -528,13 +532,62 @@ coresync/
 > consists entirely of fabricated, non-existent identifiers (e.g., `RAW-001`, `EMP-7721`,
 > `PAIR-CONF-1001`, `AZ-204-SIM`).
 >
-> This dataset contains **NO personally identifiable information (PII)**, no real employee
+> This dataset and the entire repository contain only General-level information suitable for
+> public release. It contains NO personally identifiable information (PII), no real employee
 > records, no real certification or attendance data, and no confidential information of any kind.
 >
 > All names, Employee IDs, scores, timestamps, and registration identifiers were invented
 > solely for demonstration and evaluation purposes within the Microsoft Agents League
 > Hackathon 2026. Generated artifacts (`output_segmentado.json`, `outreach_logs.json`,
 > `manager_insights.json`) inherit the same fully synthetic, non-PII status.
+
+---
+
+## Compliance & Contribution
+
+### Security & Secret Protection
+
+CoreSync enforces a **zero-secrets-in-repository** policy at every layer of the development
+and deployment lifecycle:
+
+| Control | Mechanism | Enforcement Point |
+|---|---|---|
+| No static API keys | Managed Identity (Entra ID) replaces `AZURE_OPENAI_API_KEY` entirely | Runtime / Foundry Agent Service |
+| Secret scanning | GitHub Secret Protection detects accidentally staged credentials before push | Pre-push / PR checks |
+| Push protection | GitHub Push Protection blocks commits containing tokens or private keys | Git client / GitHub |
+| No `.env` in image | `env.example` and `env.production.example` are templates only; actual `.env` files are `.gitignore`d | Dockerfile / `.gitignore` |
+| RBAC-scoped identity | Managed Identity roles are least-privilege and scoped to individual Azure resources | Azure RBAC |
+
+### Repository Classification
+
+This repository and all of its contents are classified as **General** - suitable for public
+release under the Microsoft Agents League Hackathon 2026 submission guidelines. No export
+controls, data residency restrictions, or confidentiality obligations apply to any artifact
+in this repository.
+
+### Open Source Standards
+
+- **Contributor License Agreement (CLA):** All submissions comply with standard CLA processes
+  to protect both contributors and the program ecosystem.
+- **Code of Conduct:** Community engagement, issues, and discussions within this repository
+  strictly follow the Open Source Code of Conduct guidelines.
+
+### Contributing
+
+Contributions, issue reports, and feature suggestions are welcome. Before opening a pull
+request, please ensure the following:
+
+- **No credentials** - confirm no API keys, tokens, connection strings, or `.env` files are
+  included in your diff. GitHub Push Protection will block the push if a secret pattern is detected.
+- **Synthetic data only** - any new test fixtures must use the same fabricated identifier
+  conventions already established (`RAW-XXX`, `EMP-XXXX`, `PAIR-CONF-XXXX`) and must contain
+  zero real employee, HR, or certification data.
+- **Audit Rule citations** - if you modify or extend the `DataResolver` reasoning agent,
+  ensure every new verdict path emits a `[Grounded on: Audit Rule #N]` citation in the
+  `reasoning` trace.
+- **PII abstraction** - any additions to the `ManagerInsightsAgent` output must maintain the
+  `"pii_abstracted": true` contract and must not introduce individual employee identifiers
+  into `manager_insights.json`.
 
 ---
 
