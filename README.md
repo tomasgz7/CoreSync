@@ -32,11 +32,11 @@
 
 <div align="center">
 
-[![Watch CoreSync — Agents League Hackathon 2026 Demo](https://img.youtube.com/vi/AfhFgvB9Ih4/maxresdefault.jpg)](https://youtu.be/AfhFgvB9Ih4)
+[![Watch CoreSync - Agents League Hackathon 2026 Demo](https://img.youtube.com/vi/AfhFgvB9Ih4/maxresdefault.jpg)](https://youtu.be/AfhFgvB9Ih4)
 
 **[▶ Watch the full demo on YouTube](https://youtu.be/AfhFgvB9Ih4)**
 
-*CoreSync — Reasoning Agents Track | Microsoft Agents League Hackathon 2026*
+*CoreSync - Reasoning Agents Track | Microsoft Agents League Hackathon 2026*
 
 </div>
 
