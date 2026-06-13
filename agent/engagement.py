@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+from agent.normalizer import DataNormalizer
 from agent.segmenter import SegmentedRecord
 
 logger = logging.getLogger(__name__)
@@ -193,8 +194,12 @@ class ContextualEngagementAgent:
         with path.open(encoding="utf-8") as f:
             raw = json.load(f)
 
+        # Index by normalized Employee ID (Audit Rule #5 format) so that
+        # lookups from SegmentedRecord.employee_id - which is normalized by
+        # the Curator Agent - resolve correctly regardless of the hyphenation
+        # used in the Work IQ fixture (e.g. "EMP-9014" -> "EMP9014").
         return {
-            item["employee_id"]: WorkActivitySignal(**item)
+            DataNormalizer.normalize_employee_id(item["employee_id"]): WorkActivitySignal(**item)
             for item in raw
         }
 
