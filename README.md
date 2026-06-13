@@ -28,6 +28,20 @@
 
 ---
 
+##  Presentation Video
+
+<div align="center">
+
+[![Watch CoreSync — Agents League Hackathon 2026 Demo](https://img.youtube.com/vi/AfhFgvB9Ih4/maxresdefault.jpg)](https://youtu.be/AfhFgvB9Ih4)
+
+**[▶ Watch the full demo on YouTube](https://youtu.be/AfhFgvB9Ih4)**
+
+*CoreSync — Reasoning Agents Track | Microsoft Agents League Hackathon 2026*
+
+</div>
+
+---
+
 ## The Problem
 
 Corporate Simulation Centers run certification practice sessions across parallel physical
@@ -490,6 +504,37 @@ cp env.example .env
 # Edit .env with your credentials
 python agent/main.py
 ```
+
+### Quick Start: Audit Console
+
+After running the pipeline (dry-run or live), CoreSync generates three JSON artifacts under
+`data/`. The **Audit Console** is a lightweight web dashboard that visualizes them locally —
+no build step, no external dependencies, no data leaving your machine.
+
+```bash
+# From the project root, after running the pipeline:
+python -m http.server 8000
+```
+
+Then open **[http://localhost:8000](http://localhost:8000)** in your browser.
+
+The dashboard surfaces:
+
+- **Segmentation report** — Presentes / Ausentes / Sin_Respuesta counts with severity flags (`output_segmentado.json`)
+- **Engagement outreach log** — delivery channel, optimal window, and Work IQ signal per Ausente (`outreach_logs.json`)
+- **Executive insights** — readiness index, absenteeism rate, and per-certification-track breakdown (`manager_insights.json`)
+
+> [!NOTE]
+> **Privacy-First Architecture — Why There Is No Hosted Dashboard**
+>
+> CoreSync deliberately avoids deploying the Audit Console to any external hosting provider
+> (Vercel, GitHub Pages, Netlify, etc.). HR audit data — even when synthetic — should never
+> transit a third-party CDN or be cached on infrastructure outside the organization's control.
+>
+> Running `python -m http.server 8000` keeps all JSON artifacts on the evaluator's local
+> filesystem. Nothing is uploaded, no analytics are collected, and no network request is made
+> outside the Azure services already declared in the Tech Stack. This is a deliberate
+> architectural constraint, not a deployment gap.
 
 ---
 
